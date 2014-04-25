@@ -36,31 +36,27 @@ public class MyDirectoryWatcher extends DaemonThread{
 
         if (theDirectory != null && !theDirectory.isDirectory()) {
 
-            //This is bad, so let the caller know
             String message = "The path " + directory +
                     " does not represent a valid directory.";
             throw new IllegalArgumentException(message);
 
         }
 
-        //Else all is well so set this directory and the interval
         this.directory = directoryPath;
 
     }
     
     public static void main(String[] args) {
         // Monitor every 5 seconds
-        MyDirectoryWatcher dw = new MyDirectoryWatcher("/Users/ankitkhani/Documents/test/", 5);
+        MyDirectoryWatcher dw = new MyDirectoryWatcher("/Users/ankitkhani/Documents/ClientProject/test/", 5);
         dw.start();
     }
     
     public void start() {
 
-        //Since we're going to start monitoring, we want to take a snapshot of the
-        //current directory to we have something to refer to when stuff changes.
         takeSnapshot();
 
-        //And start the thread on the given interval
+        //start the thread on the given interval
         super.start();
 
     }
@@ -97,7 +93,7 @@ public class MyDirectoryWatcher extends DaemonThread{
         takeSnapshot();
 
         //Iterate through the map of current files and compare
-        //them for differences etc...
+        //them for differences
         Iterator currentIt = currentFiles.keySet().iterator();
 
         while (currentIt.hasNext()) {
@@ -119,14 +115,9 @@ public class MyDirectoryWatcher extends DaemonThread{
 
                 //If this file existed before and has been modified
                 if (prevModified.compareTo(lastModified) != 0) {
-                    // 27 June 2006
-                    // Need to check if the file are removed and added
-                    // during the interval
-                   /* if (!DirectorySnapshot.containsFile(fileName)) {
-                        resourceAdded(new File(fileName));
-                    } else {*/
+                    
                         resourceChanged(new File(fileName));
-                    //}
+                    
                 }
             }
         }
@@ -142,7 +133,6 @@ public class MyDirectoryWatcher extends DaemonThread{
             //If this file did exist before, but it does not now, then
             //it's been deleted
             if (!currentFiles.containsKey(fileName)) {
-               //DirectorySnapshot.removeFile(fileName);
                 resourceDeleted(fileName);
             }
         }
@@ -153,15 +143,15 @@ public class MyDirectoryWatcher extends DaemonThread{
     	try {
 			Files.copy( 
 			        file.toPath(), 
-			        new File("/Users/ankitkhani/Documents/testbackup/"+file.getName()).toPath(),
+			        new File("/Users/ankitkhani/Documents/ClientProject/testbackup/"+file.getName()).toPath(),
 			        StandardCopyOption.REPLACE_EXISTING,
 			        StandardCopyOption.COPY_ATTRIBUTES);
 			
 			String fileData = readFile(file.getAbsolutePath());
 			
-			Message messageObj = new Message("create", file.getName(), fileData, null, null);
+			//Message messageObj = new Message("create", file.getName(), fileData, null, null);
 			
-	        new Thread(new SocketThread(messageObj)).start();
+	        //new Thread(new SocketThread(messageObj)).start();
 
 		} catch (IOException e) {
 			System.out.println("IO Exception in resourceAdded method");
@@ -171,19 +161,32 @@ public class MyDirectoryWatcher extends DaemonThread{
     }
 
     protected void resourceChanged(File file) {
-    	try {
-    		String dirPath = null, backupPath = null;
-    		dirPath = "/Users/ankitkhani/Documents/test/"+file.getName();
-    		backupPath = "/Users/ankitkhani/Documents/testbackup/"+file.getName();
+    	try { 
+    		String dirPath = null, backupPath = null, patchDir = null;
+    		dirPath = "/Users/ankitkhani/Documents/ClientProject/test/"+file.getName();
+    		backupPath = "/Users/ankitkhani/Documents/ClientProject/testbackup/"+file.getName();
+    		patchDir = "/Users/ankitkhani/Documents/ClientProject/patches/"+file.getName()+".patch";
     		
-    		List<String> previous = fileToLines(backupPath);
-    		List<String> newFile = fileToLines(dirPath);
+    		String command = "diff -uN "+backupPath+" "+dirPath+ " > "+patchDir;
     		
-    		SerializedPatch patch = (SerializedPatch) DiffUtils.diff(previous, newFile);
+    		System.out.println(command);
+    		
+            Process proc = Runtime.getRuntime().exec(command); 
+            
+            proc.waitFor();
+            
+            if(proc.exitValue()==0){
+        		System.out.println("OK");
+
+            }
+            
+    		System.out.println("OK Bye");
+            
+    		
     		    		
-    		Message messageObj = new Message("modify", file.getName(), null, patch, null);
+    	/*	Message messageObj = new Message("modify", file.getName(), null, null, null);
     		
-    		new Thread(new SocketThread(messageObj)).start();;
+    		new Thread(new SocketThread(messageObj)).start();*/
     		
 			Files.copy( 
 			        file.toPath(), 
@@ -193,9 +196,13 @@ public class MyDirectoryWatcher extends DaemonThread{
 		} catch (IOException e) {
 			System.out.println("IO Exception in resourceChanged method");
 			e.printStackTrace();
-		}
+		} 
         //new Thread(new SocketThread1(file.getAbsolutePath(), "modify")).start();
         //new Thread(new SocketThread2(file.getAbsolutePath(), "modify")).start();
+ catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 
     }
 
